@@ -2,12 +2,26 @@
 from __future__ import annotations
 
 import os
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-import psycopg
-from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
+try:
+    # psycopg 3
+    import psycopg
+    from psycopg.rows import dict_row
+    from psycopg.types.json import Jsonb as JSONB
+
+    PG3 = True
+except Exception:  # fallback to psycopg2
+    import psycopg2 as psycopg  # type: ignore
+    from psycopg2 import extras  # type: ignore
+
+    PG3 = False
+    JSONB = extras.Json  # type: ignore
+    # Ensure json/jsonb are decoded to Python objects
+    extras.register_default_json(loads=json.loads, globally=True)  # type: ignore
+    extras.register_default_jsonb(loads=json.loads, globally=True)  # type: ignore
 
 
 # Можно задать в окружении:
@@ -18,8 +32,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://volovo_pg@127.0.0.1:5432/
 
 
 def _conn():
-    # dict_row удобно для форм/маршрутов
-    return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    # Унифицированное подключение для psycopg3/psycopg2
+    return psycopg.connect(DATABASE_URL)
+
+
+def _dict_cursor(conn):
+    # Возвращает cursor с dict-строками независимо от версии драйвера
+    if PG3:
+        return conn.cursor(row_factory=dict_row)
+    else:
+        return conn.cursor(cursor_factory=extras.RealDictCursor)  # type: ignore
 
 
 # ----------------------------
@@ -36,7 +58,7 @@ def fetch_routes() -> List[Dict[str, Any]]:
         FROM tracking_routecatalog
         ORDER BY name
     """
-    with _conn() as conn, conn.cursor() as cur:
+    with _conn() as conn, _dict_cursor(conn) as cur:
         cur.execute(sql)
         rows = cur.fetchall()  # list[dict]
     # фронту обычно достаточно name + параметров; id тоже полезен
@@ -63,7 +85,7 @@ def fetch_oids(limit: int = 5000) -> List[Dict[str, Any]]:
         ORDER BY oid
         LIMIT %s
     """
-    with _conn() as conn, conn.cursor() as cur:
+    with _conn() as conn, _dict_cursor(conn) as cur:
         cur.execute(sql, (limit,))
         rows = cur.fetchall()
 
@@ -132,8 +154,8 @@ def insert_form(
         VALUES (NOW(), %s, %s, %s, %s, %s::jsonb, NOW())
         RETURNING id
     """
-    with _conn() as conn, conn.cursor() as cur:
-        cur.execute(sql, (oid, dt_from, dt_to, mongo_id, Jsonb(payload)))
+    with _conn() as conn, _dict_cursor(conn) as cur:
+        cur.execute(sql, (oid, dt_from, dt_to, mongo_id, JSONB(payload)))
         new_id = cur.fetchone()["id"]
         conn.commit()
         return int(new_id)
@@ -149,14 +171,14 @@ def get_form(form_id: int) -> Optional[Dict[str, Any]]:
         FROM putevoy_forms
         WHERE id = %s
     """
-    with _conn() as conn, conn.cursor() as cur:
+    with _conn() as conn, _dict_cursor(conn) as cur:
         cur.execute(sql, (form_id,))
         row = cur.fetchone()
 
     if not row:
         return None
 
-    # row уже dict благодаря dict_row
+    # row уже dict-подобный
     return {
         "id": int(row["id"]),
         "created_at": row["created_at"],
@@ -180,7 +202,7 @@ def list_forms(limit: int = 50) -> List[Dict[str, Any]]:
         ORDER BY id DESC
         LIMIT %s
     """
-    with _conn() as conn, conn.cursor() as cur:
+    with _conn() as conn, _dict_cursor(conn) as cur:
         cur.execute(sql, (limit,))
         rows = cur.fetchall()
 
