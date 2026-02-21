@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Путевой лист — Volovo</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <link rel="stylesheet" href="/putevoy/css/app.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <table class="sheet" id="sheet">
+      <colgroup>
+        <col class="c26"><col class="c27"><col class="c28"><col class="c29"><col class="c30">
+        <col class="c31"><col class="c32"><col class="c33"><col class="c34"><col class="c35">
+        <col class="c36"><col class="c37"><col class="c38"><col class="c39"><col class="c40">
+      </colgroup>
+
+      <tr>
+        <th colspan="13" class="title thick-b">ПОСЛЕДОВАТЕЛЬНОСТЬ ВЫПОЛНЕНИЯ ЗАДАНИЯ</th>
+        <th rowspan="3" class="center thick-l thick-b">подпись</th>
+        <th rowspan="3" class="center thick-b">расшифровка</th>
+      </tr>
+
+      <tr>
+        <th rowspan="2" class="center thick-r">пункт погрузки, разгрузки<br>и перецепки прицепов</th>
+        <th rowspan="2" class="center thick-r">номер<br>ездки</th>
+
+        <th colspan="3" class="center thick-r">прибытие</th>
+        <th colspan="3" class="center thick-r">параметры дороги (из справочника)</th>
+
+        <th class="center thick-r">номер прицепа</th>
+        <th class="center thick-r">порожний<br>пробег<br>прицепа</th>
+        <th colspan="3" class="center thick-r">номера приложенных ТТД</th>
+      </tr>
+
+      <tr>
+        <th class="center"></th>
+        <th class="center bg-yellow">км</th>
+        <th class="center bg-green thick-r">тонн</th>
+
+        <th class="center">ширина (м)</th>
+        <th class="center">длина (км)</th>
+        <th class="center thick-r">тоннаж (т)</th>
+
+        <th class="center thick-r"></th>
+        <th class="center thick-r"></th>
+
+        <th class="center">Доставка</th>
+        <th class="center">37</th>
+        <th class="center thick-r">Холостой ход</th>
+      </tr>
+
+      <!-- 8 строк -->
+      <!-- строка 1 -->
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">1</td>
+        <td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r">
+          <input class="tons-input trip-tons" type="number" step="0.01" min="0" placeholder="">
+        </td>
+
+        <td class="center js-width"></td>
+        <td class="right js-length"></td>
+        <td class="right thick-r js-tons"></td>
+
+        <td class="center thick-r"></td>
+        <td class="right thick-r"></td>
+
+        <td class="right delivery-cell"></td>
+        <td></td>
+        <td class="right thick-r"></td>
+
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <!-- строки 2..8 -->
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">2</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">3</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">4</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">5</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">6</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">7</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <tr class="data-row">
+        <td class="thick-r"><select class="route"></select></td>
+        <td class="center thick-r">8</td><td></td>
+        <td class="right bg-yellow trip-km"></td>
+        <td class="right bg-green thick-r"><input class="tons-input trip-tons" type="number" step="0.01" min="0"></td>
+        <td class="center js-width"></td><td class="right js-length"></td><td class="right thick-r js-tons"></td>
+        <td class="center thick-r"></td><td class="right thick-r"></td>
+        <td class="right delivery-cell"></td><td></td><td class="thick-r"></td>
+        <td class="thick-l"></td><td></td>
+      </tr>
+
+      <!-- ИТОГО -->
+      <tr>
+        <td class="thick-r"></td>
+        <td class="thick-r"></td>
+        <td></td>
+        <td class="right bg-yellow" id="total_km_sum_cell">0,00</td>
+        <td class="right bg-green thick-r" id="total_tons_sum_cell">0,00</td>
+        <td></td>
+        <td class="center bg-red" id="total_km_points_cell">0,00</td>
+        <td class="center thick-r" id="vehicle_tonnage_cell">—</td>
+        <td class="center thick-r" id="trips_count_cell">—</td>
+        <td class="center thick-r" id="total_tons_cell">—</td>
+
+        <td class="right" id="ttd_km_delivery_cell"></td>
+        <td></td>
+        <td class="right thick-r" id="ttd_38_idle_cell"></td>
+
+        <td class="thick-l"></td><td></td>
+      </tr>
+    </table>
+
+    <div class="filters">
+      <label>
+        Авто (OID):
+        <select id="oidSelect"></select>
+        <div class="muted">Берётся из Mongo: distinct oid</div>
+      </label>
+
+      <label>
+        С (дата/время):
+        <input id="dtFrom" type="datetime-local" />
+      </label>
+
+      <label>
+        По (дата/время):
+        <input id="dtTo" type="datetime-local" />
+      </label>
+
+      <label>
+        GPS скачок (км):
+        <input id="maxJump" type="number" step="0.1" value="1.0" style="width:130px;">
+      </label>
+
+      <label>
+        Макс. скорость (км/ч):
+        <input id="maxSpeed" type="number" step="10" value="180" style="width:150px;">
+      </label>
+
+      <label>
+        Мин. длина рейса (км):
+        <input id="minTripKm" type="number" step="0.1" value="1.0" style="width:150px;">
+      </label>
+
+      <button id="btnLoad">Загрузить по фильтру</button>
+      <button id="btnExportXlsx">Экспорт в Excel</button>
+      <button id="btnPrint">Печать</button>
+
+      <div class="stat" id="stat">Загрузка…</div>
+    </div>
+
+    <div class="mapBox">
+      <div class="mapHeader">
+        <b>Маршрут на карте (рейсы слоями)</b>
+        <span class="muted" id="mapInfo"></span>
+      </div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- ✅ единственный JS проекта -->
+  <script src="/putevoy/js/app.js" defer></script>
+</body>
+</html>

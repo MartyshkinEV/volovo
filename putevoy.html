@@ -197,19 +197,17 @@
       body { background: white; }
       table.sheet { box-shadow: none; border: 2px solid black !important; }
     }
-        /* убираем любые иконки/картинки, которые могли появиться в attribution */
+
     .leaflet-control-attribution img,
     .leaflet-control-attribution svg {
       display: none !important;
     }
 
-    /* убираем псевдо-иконки, если их добавили через ::before/::after */
     .leaflet-control-attribution *::before,
     .leaflet-control-attribution *::after {
       content: none !important;
       background: none !important;
     }
-
   </style>
 </head>
 
@@ -276,17 +274,13 @@
       <td class="center thick-r"></td>
       <td class="right thick-r"></td>
 
-      <!-- 36: доставка по строке -->
       <td class="right delivery-cell"></td>
-      <!-- 37 -->
       <td></td>
-      <!-- 38 -->
       <td class="right thick-r"></td>
 
       <td class="thick-l"></td><td></td>
     </tr>
 
-    <!-- 2..8 -->
     <tr class="data-row">
       <td class="thick-r"><select class="route"></select></td>
       <td class="center thick-r">2</td><td></td>
@@ -377,11 +371,8 @@
       <td class="center thick-r" id="trips_count_cell">—</td>
       <td class="center thick-r" id="total_tons_cell">—</td>
 
-      <!-- 36: ИТОГО доставка -->
       <td class="right" id="ttd_km_delivery_cell"></td>
-      <!-- 37 -->
       <td></td>
-      <!-- 38: ИТОГО холостой -->
       <td class="right thick-r" id="ttd_38_idle_cell"></td>
 
       <td class="thick-l"></td><td></td>
@@ -447,6 +438,9 @@
 <script>
   const API = "";
 
+  // Пескобаза (как в backend)
+  const SAND_BASE = { lat: 52.036242, lon: 37.887744, radius_km: 0.02 };
+
   const oidSelect = document.getElementById("oidSelect");
   const dtFrom = document.getElementById("dtFrom");
   const dtTo = document.getElementById("dtTo");
@@ -460,11 +454,11 @@
   const mapInfo = document.getElementById("mapInfo");
 
   // итоги
-  const totalKmPointsCell = document.getElementById("total_km_points_cell"); // GPS total (из API)
+  const totalKmPointsCell = document.getElementById("total_km_points_cell"); // GPS total (из API) -> теперь km_dst
   const totalKmSumCell = document.getElementById("total_km_sum_cell");       // расчётный км по введённым тоннам
   const totalTonsSumCell = document.getElementById("total_tons_sum_cell");   // сумма введённых тонн
 
-  // TTD-итоги (теперь в строке ИТОГО)
+  // TTD-итоги
   const ttdKmDeliveryCell = document.getElementById("ttd_km_delivery_cell");
   const ttd38IdleCell = document.getElementById("ttd_38_idle_cell");
 
@@ -484,6 +478,22 @@
   ]);
 
   const ROUTES = new Map();
+  function pad2(n){ return String(n).padStart(2,"0"); }
+
+  function setDefaultDateTimes(){
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = pad2(now.getMonth()+1);
+    const d = pad2(now.getDate());
+    const date = `${y}-${m}-${d}`;
+
+  // "С" = 00:00, "По" = 23:59
+  if(!dtFrom.value) dtFrom.value = `${date}T00:00`;
+  if(!dtTo.value)   dtTo.value   = `${date}T23:59`;
+}
+
+setDefaultDateTimes();
+
 
   function dtLocalToApi(v){
     if(!v) return "";
@@ -506,7 +516,6 @@
   }
 
   function parseTonsCellTextToNumber(txt){
-    // "518 т" -> 518
     if(!txt) return 0;
     const s = String(txt).replace(/[^0-9,.\-]/g, "").replace(",", ".");
     const n = Number(s);
@@ -528,7 +537,7 @@
   // ---- MAP ----
   const map = L.map("map").setView([52.05, 37.99], 11);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-     maxZoom: 19,
+    maxZoom: 19,
     attribution: ""
   }).addTo(map);
 
@@ -605,7 +614,6 @@
     const k = coeffByWidth(widthM);
     let km = tons / k;
 
-    // Ограничение по длине маршрута
     const lengthCell = row.querySelector(".js-length");
     const maxLen = Number(String(lengthCell.textContent).replace(",", "."));
     if (Number.isFinite(maxLen) && km > maxLen) {
@@ -615,7 +623,6 @@
     kmCell.textContent = fmt2(km);
   }
 
-  // ✅ доставка по строке: (тонн / тоннаж_авто) * 16
   function recalcRowDelivery(row){
     const deliveryCell = row.querySelector(".delivery-cell");
     const tonsInput = row.querySelector(".trip-tons");
@@ -655,11 +662,9 @@
     totalTonsSumCell.textContent = fmt2(totalTons);
     totalKmSumCell.textContent = fmt2(totalKm);
 
-    recalcDeliveryAndIdleTotals(); // ✅ итоги доставки/холостого
+    recalcDeliveryAndIdleTotals();
   }
 
-  // ✅ ИТОГО доставка: (общий тоннаж авто / тоннаж авто) * 16
-  // где "общий тоннаж авто" = totalTonsCell (например "518 т")
   function recalcDeliveryAndIdleTotals(){
     const vTonnage = getVehicleTonnage();
     const totalTonsAuto = parseTonsCellTextToNumber(totalTonsCell.textContent);
@@ -775,7 +780,6 @@
     wireRouteSelects();
     wireTonsInputs();
 
-    // пересчёт сразу
     const rows = Array.from(document.querySelectorAll("tr.data-row"));
     rows.forEach(r => recalcRowDelivery(r));
     recalcTotals();
@@ -785,7 +789,7 @@
     let apiOids = [];
     try{
       const data = await fetchJSON(`${API}/api/oids`);
-      apiOids = (data.oids || []).map(Number);
+      apiOids = (data.oids || []).map(x => Number(x.oid ?? x));
     }catch(e){
       apiOids = [];
     }
@@ -810,7 +814,6 @@
       oidSelect.appendChild(opt);
     }
 
-    // ✅ при смене авто — пересчёт доставки по строкам и итогов
     oidSelect.addEventListener("change", () => {
       const rows = Array.from(document.querySelectorAll("tr.data-row"));
       rows.forEach(r => recalcRowDelivery(r));
@@ -844,7 +847,12 @@
       + `&max_speed_kmh=${encodeURIComponent(ms)}`;
 
     const sum = await fetchJSON(urlSum);
-    totalKmPointsCell.textContent = fmt2(sum.total_km || 0);
+
+    // ✅ ГЛАВНОЕ: теперь берём пробег "как ГЛОНАСС" из km_dst
+    const gpsKm = Number(sum.km_dst || 0);
+    totalKmPointsCell.textContent = fmt2(gpsKm);
+
+    const jumpsRemoved = sum.jump_filter ? Number(sum.jump_filter.removed || 0) : 0;
 
     vehicleTonnageCell.textContent = vehicleTonnage ? (vehicleTonnage.toFixed(0) + " т") : "—";
     tripsCountCell.textContent = "—";
@@ -854,72 +862,79 @@
 
     stat.innerHTML =
       `Авто: <b>${vehicleName}</b> (OID: ${sum.oid})<br>` +
-      `Период: <b>${sum.dt_from || "—"}</b> … <b>${sum.dt_to || "—"}</b><br>` +
-      `Точек (после фильтра): <b>${sum.points_count_used}</b><br>` +
-      `Удалено скачков: <b>${sum.gps_jumps_removed}</b><br>` +
-      `Общий км по GPS: <b>${fmt2(sum.total_km || 0)}</b><br>` +
+      `Период: <b>${sum.tm_from || "—"}</b> … <b>${sum.tm_to || "—"}</b><br>` +
+      `Точек (всего/после фильтра): <b>${sum.points_cnt ?? 0}</b> / <b>${sum.points_cnt_filtered ?? 0}</b><br>` +
+      `Удалено скачков: <b>${jumpsRemoved}</b><br>` +
+      `Общий км по GPS (dst): <b>${fmt2(gpsKm)}</b><br>` +
       `Заезды на пескобазу (погрузка): <b>${sum.sand_base_entries ?? 0}</b>`;
 
     mapInfo.textContent = "делю на рейсы и рисую слоями…";
     clearTripsLayers();
 
+    // ✅ пескобаза локально
+    const sbLatLng = [SAND_BASE.lat, SAND_BASE.lon];
+    sandBaseMarker = L.marker(sbLatLng).addTo(map).bindPopup("Пескобаза (погрузка)");
+    sandBaseCircle = L.circle(sbLatLng, {
+      radius: (SAND_BASE.radius_km || 0.02) * 1000.0,
+      weight: 2,
+      fillOpacity: 0.05
+    }).addTo(map);
+    addBounds(sandBaseCircle.getBounds());
+
+    // ✅ новый trips endpoint и параметры
     const urlTrips = `${API}/api/trips_for_map?oid=${encodeURIComponent(oid)}`
       + (f ? `&dt_from=${encodeURIComponent(f)}` : "")
       + (t ? `&dt_to=${encodeURIComponent(t)}` : "")
-      + `&max_points_per_trip=2000`
-      + `&max_jump_km=${encodeURIComponent(mj)}`
-      + `&max_speed_kmh=${encodeURIComponent(ms)}`
-      + `&min_trip_km=${encodeURIComponent(minTripKm)}`;
+      + `&max_points=${encodeURIComponent(2000)}`;
 
     const tripsData = await fetchJSON(urlTrips);
 
-    const tripsCount = Number(tripsData.trips_count || 0);
+    const trips = tripsData.trips || [];
+    const tripsCount = Number(trips.length || 0);
     const totalTonsAuto = vehicleTonnage * tripsCount;
 
     vehicleTonnageCell.textContent = vehicleTonnage ? (vehicleTonnage.toFixed(0) + " т") : "—";
     tripsCountCell.textContent = String(tripsCount);
     totalTonsCell.textContent = vehicleTonnage ? (totalTonsAuto.toFixed(0) + " т") : "—";
 
-    // ✅ пересчёт итогов (по твоей формуле)
     recalcDeliveryAndIdleTotals();
 
-    const sb = tripsData.sand_base;
-    if(sb){
-      const sbLatLng = [sb.lat, sb.lon];
-      sandBaseMarker = L.marker(sbLatLng).addTo(map).bindPopup("Пескобаза (погрузка)");
-      sandBaseCircle = L.circle(sbLatLng, {
-        radius: (sb.radius_km || 0.07) * 1000.0,
-        weight: 2,
-        fillOpacity: 0.05
-      }).addTo(map);
-      addBounds(sandBaseCircle.getBounds());
-    }
-
-    const trips = tripsData.trips || [];
     if(trips.length === 0){
-      mapInfo.textContent = "рейсов не найдено (возможно нет въездов на пескобазу или все отфильтрованы)";
+      mapInfo.textContent = "рейсов не найдено (нет въездов на пескобазу или слишком жёсткий фильтр)";
       if(allBounds) map.fitBounds(allBounds, {padding:[20,20]});
       return;
     }
 
-    trips.forEach((tr, idx) => {
+    // ✅ применяем "мин. длина рейса" на клиенте по km_dst
+    const tripsFiltered = trips.filter(tr => Number(tr.km_dst || 0) >= minTripKm);
+
+    if(tripsFiltered.length === 0){
+      mapInfo.textContent = `рейсы есть, но все короче ${minTripKm} км (по km_dst)`;
+      if(allBounds) map.fitBounds(allBounds, {padding:[20,20]});
+      return;
+    }
+
+    tripsFiltered.forEach((tr, idx) => {
       const pts = (tr.points || []).map(p => [p.lat, p.lon]);
       if(pts.length < 2) return;
 
       const color = TRIP_COLORS[idx % TRIP_COLORS.length];
-      const km = (tr.distance_km !== undefined && tr.distance_km !== null)
-        ? tr.distance_km.toFixed(2).replace(".", ",")
-        : "?";
 
-      const name = `Рейс ${tr.trip_no} — ${km} км (${tr.tm_start || "?"} → ${tr.tm_end || "?"})`;
+      const km = Number(tr.km_dst || 0).toFixed(2).replace(".", ",");
+      const tripNo = tr.i ?? (idx + 1);
+
+      const tmStart = tr.tm_from || "";
+      const tmEnd = tr.tm_to || "";
+
+      const name = `Рейс ${tripNo} — ${km} км (dst) (${tmStart} → ${tmEnd})`;
 
       const g = L.layerGroup();
       const line = L.polyline(pts, { weight: 5, color }).addTo(g);
 
       L.circleMarker(pts[0], { radius: 5, weight: 2, color }).addTo(g)
-        .bindPopup(`Рейс ${tr.trip_no}: старт<br>${tr.tm_start || ""}`);
+        .bindPopup(`Рейс ${tripNo}: старт<br>${tmStart}`);
       L.circleMarker(pts[pts.length-1], { radius: 5, weight: 2, color }).addTo(g)
-        .bindPopup(`Рейс ${tr.trip_no}: финиш<br>${tr.tm_end || ""}`);
+        .bindPopup(`Рейс ${tripNo}: финиш<br>${tmEnd}`);
 
       overlays[name] = g;
       g.addTo(map);
@@ -934,17 +949,16 @@
     }
 
     mapInfo.textContent =
-      `рейсов: ${tripsData.trips_count}, заездов на пескобазу: ${tripsData.sand_base_entries}, ` +
-      `точек (в базе: ${tripsData.original_count}, после фильтра: ${tripsData.filtered_count}, скачков удалено: ${tripsData.gps_jumps_removed}), ` +
-      `мин. длина рейса: ${minTripKm} км`;
+      `рейсов: ${tripsFiltered.length}/${trips.length}, заездов на пескобазу: ${sum.sand_base_entries ?? 0}, ` +
+      `точек (в базе: ${sum.points_cnt ?? 0}, после фильтра: ${sum.points_cnt_filtered ?? 0}, скачков удалено: ${jumpsRemoved}), ` +
+      `мин. длина рейса: ${minTripKm} км (по km_dst)`;
 
-    // ✅ пересчёт строк доставки/итогов
     const rows = Array.from(document.querySelectorAll("tr.data-row"));
     rows.forEach(r => recalcRowDelivery(r));
     recalcTotals();
   }
 
-  // ---- EXPORT: SAVE TO MONGO -> EXPORT BY ID ----
+  // ---- EXPORT ----
   function collectTableData(){
     const rows = Array.from(document.querySelectorAll("tr.data-row"));
     const outRows = rows.map((row) => {
@@ -955,10 +969,7 @@
       const width = row.querySelector(".js-width")?.textContent?.trim() || "";
       const length = row.querySelector(".js-length")?.textContent?.trim() || "";
       const pssTonnage = row.querySelector(".js-tons")?.textContent?.trim() || "";
-
-      // ✅ доставка ПО СТРОКЕ
       const delivery = row.querySelector(".delivery-cell")?.textContent?.trim() || "";
-
       return { route, tripNo, km, tons, width, length, pssTonnage, delivery };
     });
 
@@ -971,8 +982,8 @@
       totals: {
         km_spread: totalKmSumCell.textContent?.trim() || "",
         tons_sum: totalTonsSumCell.textContent?.trim() || "",
+        // ✅ в Excel будет km_gps = km_dst (пробег как ГЛОНАСС)
         km_gps: totalKmPointsCell.textContent?.trim() || "",
-        // ✅ итоги (теперь в строке ИТОГО)
         delivery: ttdKmDeliveryCell?.textContent?.trim() || "",
         idle: ttd38IdleCell?.textContent?.trim() || ""
       },
@@ -1028,7 +1039,6 @@
     });
   });
 
-  // ---- PRINT ----
   btnPrint.addEventListener("click", () => window.print());
 
   btnLoad.addEventListener("click", () => {
