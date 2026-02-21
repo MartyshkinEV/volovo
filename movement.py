@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 import requests
 from pymongo import MongoClient, UpdateOne, ASCENDING
@@ -218,7 +218,8 @@ def login_and_get_cookie_line(session: requests.Session) -> str:
     loc = r2.headers.get("Location")
     if loc:
         # добираем редирект, чтобы докрутить сессию
-        session.get(f"{BASE}{loc}", timeout=HTTP_TIMEOUT)
+        redir_url = urljoin(BASE + "/", loc)
+        session.get(redir_url, timeout=HTTP_TIMEOUT, allow_redirects=True)
 
     cookie_line = cookie_line_from_jar(session.cookies)
 
