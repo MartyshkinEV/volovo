@@ -4,7 +4,7 @@ import math
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import openpyxl
 from fastapi import Body, FastAPI, Query
@@ -12,7 +12,51 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-import pgdb  # <-- NEW
+# Пытаемся импортировать модуль работы с Postgres; если его нет — используем безопасный заглушечный вариант
+try:
+    import pgdb as _pgdb  # type: ignore
+    pgdb = _pgdb
+except Exception:
+    class _PgdbStub:
+        def __init__(self):
+            self._forms: Dict[int, Dict[str, Any]] = {}
+            self._auto_id = 1
+
+        def fetch_points(self, oid: int, d1: Optional[datetime], d2: Optional[datetime], limit: int = 500_000):
+            return []
+
+        def insert_form(self, oid: int, dt_from: Optional[datetime], dt_to: Optional[datetime], payload: Dict[str, Any], mongo_id: Optional[str] = None) -> int:
+            fid = self._auto_id
+            self._auto_id += 1
+            self._forms[fid] = {
+                "id": fid,
+                "created_at": datetime.utcnow(),
+                "payload": payload,
+            }
+            return fid
+
+        def get_form(self, form_id: int) -> Optional[Dict[str, Any]]:
+            return self._forms.get(form_id)
+
+        def list_forms(self, limit: int = 50) -> List[Dict[str, Any]]:
+            out = []
+            for fid in sorted(self._forms.keys(), reverse=True)[:limit]:
+                doc = self._forms[fid]
+                payload = doc.get("payload") or {}
+                out.append({
+                    "form_id": str(fid),
+                    "created_at": doc.get("created_at"),
+                    "meta": payload.get("meta") or {},
+                })
+            return out
+
+        def fetch_oids(self, limit: int = 500) -> List[int]:
+            return []
+
+        def fetch_routes(self) -> List[Dict[str, Any]]:
+            return []
+
+    pgdb = _PgdbStub()
 
 # -----------------------------
 # Настройки
@@ -31,7 +75,9 @@ SAND_BASE_RADIUS_KM = 0.02  # 20 метров (0.02 км)
 app = FastAPI(title="Volovo Putevoy + Map + Trips + Postgres")
 
 # статические файлы бери из проекта, а не абсолютным /opt/...
-app.mount("/putevoy", StaticFiles(directory=str(BASE_DIR / "putevoy"), html=True), name="putevoy")
+_putevoy_dir = BASE_DIR / "putevoy"
+if _putevoy_dir.exists():
+    app.mount("/putevoy", StaticFiles(directory=str(_putevoy_dir), html=True), name="putevoy")
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,7 +120,6 @@ def parse_tm(s: Optional[str]) -> Optional[datetime]:
 
 
 def fmt_tm(dt: datetime) -> str:
-    # для фронта оставляем привычный формат "YYYY-MM-DD HH:MM:SS"
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -113,7 +158,7 @@ def iter_points_for_oid(
                 "tm": fmt_tm(tm_dt),
                 "tm_dt": tm_dt,
                 "idx": idx,
-                "dst": None,     # в PG нет dst -> считаем по координатам
+                "dst": None,
                 "speed": None,
             }
         )
@@ -132,7 +177,6 @@ def calc_total_km(points: List[Dict[str, Any]]) -> float:
 
 
 def calc_total_km_dst(points: List[Dict[str, Any]]) -> float:
-    # Раньше было по "dst" из Mongo. В PG "dst" нет — делаем то же, что calc_total_km.
     return calc_total_km(points)
 
 
@@ -168,7 +212,6 @@ def gps_filter_jumps(points: List[Dict[str, Any]], max_jump_km: float = 1.0, max
 
 
 def count_sand_base_entries(points: List[Dict[str, Any]]) -> int:
-    # простая логика "въездов" в круг пескобазы
     inside_prev = False
     entries = 0
     for p in points:
@@ -251,10 +294,12 @@ def _sanitize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def fill_putevoy_xlsx(payload: Dict[str, Any], template_path: Path) -> str:
-    wb = openpyxl.load_workbook(template_path)
+    if template_path.exists():
+        wb = openpyxl.load_workbook(template_path)
+    else:
+        wb = openpyxl.Workbook()
     ws = wb.active
 
-    # примитивный пример: переносим totals в пару ячеек (оставил как у тебя идея)
     totals = payload.get("totals") or {}
     ws["AF17"] = totals.get("km_gps") or ""
     ws["AF18"] = totals.get("km_spread") or ""
@@ -293,10 +338,10 @@ def get_form(form_id: str):
     if not doc:
         return JSONResponse({"error": "not found"}, status_code=404)
 
-    payload = doc["payload"] or {}
+    payload = doc.get("payload") or {}
     return {
-        "form_id": str(doc["id"]),
-        "created_at": doc["created_at"].isoformat(timespec="seconds") if doc["created_at"] else "",
+        "form_id": str(doc.get("id") or form_id),
+        "created_at": (doc.get("created_at").isoformat(timespec="seconds") if doc.get("created_at") else ""),
         **payload,
     }
 
@@ -308,9 +353,9 @@ def list_forms(limit: int = Query(50, ge=1, le=500)):
     for f in forms:
         out.append(
             {
-                "form_id": f["form_id"],
-                "created_at": f["created_at"].isoformat(timespec="seconds") if f["created_at"] else "",
-                "meta": f["meta"] or {},
+                "form_id": f.get("form_id"),
+                "created_at": f.get("created_at").isoformat(timespec="seconds") if f.get("created_at") else "",
+                "meta": f.get("meta") or {},
             }
         )
     return {"forms": out}
@@ -325,7 +370,7 @@ def export_xlsx_from_db(form_id: str):
     if not doc:
         return JSONResponse({"error": "not found"}, status_code=404)
 
-    payload = doc["payload"] or {}
+    payload = doc.get("payload") or {}
     out_path = fill_putevoy_xlsx(payload, TEMPLATE_XLSX)
     return FileResponse(
         out_path,
